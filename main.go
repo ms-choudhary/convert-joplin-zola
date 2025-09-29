@@ -47,7 +47,7 @@ func slug(in string) string {
 	for _, c := range in {
 		if unicode.IsLetter(c) || unicode.IsNumber(c) || c == '.' {
 			out = append(out, c)
-		} else {
+		} else if out[len(out)-1] != '-' {
 			out = append(out, '-')
 		}
 	}
@@ -68,7 +68,7 @@ func copyFile(src, dst string) error {
 	}
 	defer dstFs.Close()
 
-	_, err = io.Copy(srcFs, dstFs)
+	_, err = io.Copy(dstFs, srcFs)
 	if err != nil {
 		return fmt.Errorf("failed to copy: %v", err)
 	}
@@ -76,7 +76,7 @@ func copyFile(src, dst string) error {
 }
 
 func main() {
-	resourcesToCopy := map[string]bool{}
+	resourcesToCopy := map[string]struct{}{}
 	err := fs.WalkDir(os.DirFS(JoplinWebsitePath), ".", func(filepath string, file fs.DirEntry, err error) error {
 		if err != nil {
 			return err
@@ -116,7 +116,8 @@ func main() {
 				header = fmt.Sprintf("%s%s\n", header, line)
 			} else {
 				if resource := ResourceRe.Find([]byte(line)); resource != nil {
-					resourcesToCopy[string(resource)] = true
+					resourcesToCopy[string(resource)] = struct{}{}
+					line = strings.ReplaceAll(line, "../../_resources/", "/images/")
 				}
 				body = fmt.Sprintf("%s%s\n", body, line)
 			}
@@ -156,14 +157,14 @@ func main() {
 		log.Fatal(err)
 	}
 
-	//for file := range resourcesToCopy {
-	//srcPath := JoplinPath + "/_resources/" + file
-	//dstPath := ZolaPath + "/_resources/" + file
+	for file := range resourcesToCopy {
+		srcPath := JoplinPath + "/_resources/" + file
+		dstPath := ZolaPath + "/static/images/" + file
 
-	//if err := copyFile(srcPath, dstPath); err != nil {
-	//log.Fatal(err)
-	//}
-	//}
+		if err := copyFile(srcPath, dstPath); err != nil {
+			log.Fatal(err)
+		}
+	}
 
 	if err := os.RemoveAll(JoplinPath); err != nil {
 		log.Fatal(err)
